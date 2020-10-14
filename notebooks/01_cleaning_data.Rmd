@@ -1,4 +1,206 @@
 ---
 title: "Cleaning Data"
-output: html_notebook
+output:
+  html_notebook:
+    toc: yes
+  
 ---
+
+The purpose of this notebook is to clean the F1 data so I can work with it for my analysis of winning teams.
+
+Let's first load the right libraries:
+```{r}
+library(tidyverse)
+```
+And our data:
+```{r}
+race_results <- read_csv("../data/race_results_statsf1.csv")
+head(race_results)
+```
+
+## Looking at the data before we clean. 
+
+With this dataset, we have the following columns:
+
+1.`race_id`: The number of the race. 1 is the first race in F1, and the biggest number is the last race of 2019 as of now.  
+2. `year`: The year the F1 season took place. Races for a season happened in 1 calendar year.  
+3. `round`: The order of the race for that year. 1 is the first race for a season, 2 is the second, and so on.  
+4. `race_name`: Name of the country where the Grand Prix race was held.  
+5. `position`: The finishing position value scraped from Stats F1. There are both number finishes and a series of characters & abbreviations. I tried to interpret these in the `p_prelim` column based on the abbreviations [here](https://www.statsf1.com/en/saisons.aspx)  
+6. `p_prelim`: The interpreted numerical finishing position based on the `position` column. There might need to be some rechecking of what things mean in this column, and a new name.  
+7. `driver`: the name of the driver. Last name is in All-caps.  
+8. `team`: the name of the car manufacturer the driver raced in in a particular race. Also known as the constructor.
+9. `constructor_long`: the combination of the team name and the engine test.
+10. `extra`: extra information like finishing times, lap times, and reasons for retiring, withdrawing, or being removed from a race.
+
+## Verifying the different variables.
+
+Let's go variable by variable, see what's there and then try to make notes of how we might clean this.
+
+### race_id
+
+Let's look at just this variable right now:
+```{r}
+race_id <- race_results %>% select(race_id)
+
+summary(race_id)
+```
+Looking at this variable, the biggest value currently is `r max(race_id)`. I know the 2019 Chinese GP was the 1000th race. If I count from that race in the [2019 Calendar](https://en.wikipedia.org/wiki/2019_Formula_One_World_Championship#Calendar) the 21st race of the season, the Abu Dhabi GP, was the 1018th race.
+
+So that looks good.
+
+### year
+
+```{r}
+year <- race_results %>% select(year)
+
+summary(year)
+```
+So the years column looks fine. We should only have data for 1950 to 2019 for now.
+
+### round
+
+This corresponds to the order of the race in each season. We could check it by seeing how many races there were each year.
+
+```{r}
+race_results %>% 
+  select(year, round) %>% 
+  distinct(year, round) %>%
+  group_by(year) %>%
+  summarise(races_count = n())
+```
+
+Let's try to visualize that, by first saving all that previous code to a variable:
+
+```{r}
+annual_races_count <- race_results %>% select(year, round) %>% distinct(year, round) %>% group_by(year) %>% summarise(races_count = n())
+
+ggplot(annual_races_count, aes(x=year, y=races_count))+
+         geom_point(size=2) + labs(y="Number of races")
+```
+
+The first season had 7 races and over time, we got more races. It'd be interesting to explore **why** the number of races went up.
+
+### race_name
+
+`race_name` refers to the country where races were held. Let's explore this variable to see what country has hosted the most races:
+
+```{r}
+race_name <- race_results %>% select(race_name)
+
+race_name %>% group_by(race_name) %>% summarize(count = n())
+```
+
+Looking at just the race names is difficult. So let's look at the race_name and year.
+
+```{r}
+race_name <- select(race_results, year, race_name)
+
+race_name %>% distinct(year, race_name) %>% group_by(race_name) %>% summarize(count = n()) %>% arrange(desc(count))
+```
+
+Italy and Britain have hosted the most races. If we look at the data though there's some weirdness like there being USA, USA East, USA West, Indianapolis, and Las Vegas as all being Grand Prixs that happened in America. For my analysis where I'm looking at team performance, I don't mind this issue as much, but good to note it now.
+
+If I cared about this variable, I might make a new variable for country and create the values for that variable based on this variable.
+
+
+### position
+
+The driver's finishing position. It's either a number or a alphanumeric code with definitions [here](https://www.statsf1.com/en/saisons.aspx). Just in case let's try to explain them:
+
+* ab: Retired
+* nc : Not classified
+* np : Not started
+* nq : Not qualified
+* npq : Not pre-qualified
+* dsq : Disqualified
+* exc : Excluded
+* f : Withdrawal
+* tf : Parade lap
+
+To really understand these, I'd read up on races where these symbols showed up. I'll save that for a later day
+
+**TODO**: Find out the best explanation of what each of the above codes mean with examples.
+
+### p_prelim
+
+My interpretation of the position column. I need to verify this thoroughly to explain the logic I took when I scraped. But I might just create a new column based on the position column.
+
+```{r}
+p_prelim <- select(race_results, p_prelim)
+summary(p_prelim)
+```
+`-1` here means the driver was disqualified.
+
+**TODO**: Figure out what the logic for this part was and try to make sure it's correct.
+
+### driver
+
+The driver's name. Most of them got scraped well but not all. Would be a good idea to clean the messed up one. We can check which ones need cleaning by seeing how many times each driver competed in F1.
+
+```{r}
+driver <- select(race_results, race_id, driver)
+driver %>% distinct(race_id, driver) %>%
+          group_by(driver) %>% 
+          summarize(count = n()) %>%
+          arrange(desc(count))
+```
+
+Looking at the list, the names that need to be fixed are:
+* `Andr� GUELFI` to `André GUELFI`  
+* `Andr� LOTTERER` to `André LOTTERER`  
+* `Andr� MILHOUX`	to `André MILHOUX`  
+* `Andr� PILETTE` to `André PILETTE`  
+* `Andr� SIMON` to `André SIMON`  
+* `Andr� TESTUT` to `André TESTUT`  
+* `Azdr�bal BAYARDO` to `Azdrúbal BAYARDO`  
+* `Eug�ne CHABOUD` to `Eugène CHABOUD`  
+* `Eug�ne MARTIN` to `Eugène MARTIN`  
+* `Fran�ois CEVERT` to `François CEVERT`  
+* `Fran�ois HESNAULT` to `François HESNAULT`  
+* `Fran�ois MAZET` to `François MAZET`  
+* `Fran�ois MIGAULT` to `François MIGAULT`  
+* `G�nther BECHEM` to `Günther BECHEM`  
+* `G�rard LARROUSSE` to `Gérard LARROUSSE`  
+* `Jean-�ric VERGNE` to `Jean-Éric VERGNE`  
+* `Jos� DOLHEM` to `José DOLHEM`  
+* `J�r�me d'AMBROSIO` to `Jérôme d'AMBROSIO`  
+* `Peter ST�CHELIN` to `Peter STÆCHELIN`  
+* `Ren� ARNOUX` to `René ARNOUX`  
+* `S�bastien BOURDAIS` to `Sébastien BOURDAIS`  
+* `St�phane SARRAZIN` to `Stéphane SARRAZIN`  
+* `S�bastien BUEMI` to `Sébastien BUEMI`  
+* `Tom BELS�` to `Tom BELSØ`  
+
+### team
+
+The name of the team the driver was driving for. The team is the one producing the car so they're also called constructor.
+
+**TODO:** Rename column to constructor.
+
+Let's look at what teams have been around:
+```{r}
+select(race_results, race_id, team)%>%
+  distinct(race_id, team) %>%
+  group_by(team) %>% 
+  summarize(count = n())
+```
+
+**TODO** Figure out what those `*` next to some teams mean. How should we deal with those?
+
+There were some `NA` for rows that had `position == '&'`. We should fill with the value from above
+
+### constructor_long
+
+The combination of constructor and engine. Let's look at them:
+```{r}
+select(race_results, race_id, constructor_long)%>%
+  distinct(race_id, constructor_long) %>%
+  group_by(constructor_long) %>% 
+  summarize(count = n())
+```
+I don't particularly care about this column, so there is no real need to clean it at the moment.
+
+### extra
+
+This column contains a variety of extra information like finishing times, lap times, and reasons for not finishing a race among other things. This column should definitely be cleaned up of the extra broken characters, because it might be good to look at the common reasons for not finishing a race. We would definitely have to find a way of getting rid of the lap times and such.
