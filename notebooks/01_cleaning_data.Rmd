@@ -3,7 +3,8 @@ title: "Pre-Analysis F1 Data"
 output:
   html_notebook:
     toc: yes
-  
+  git_document:
+    toc: yes
 ---
 
 The purpose of this notebook is to clean the F1 data so I can work with it for my analysis of winning teams.
@@ -37,7 +38,7 @@ With this dataset, we have the following columns:
 
 Let's go variable by variable, see what's there and then try to make notes of how we might clean this.
 
-### race_id
+### `race_id`
 
 Let's look at just this variable right now:
 ```{r}
@@ -49,7 +50,7 @@ Looking at this variable, the biggest value currently is `r max(race_id)`. I kno
 
 So that looks good.
 
-### year
+### `year`
 
 ```{r}
 year <- race_results %>% select(year)
@@ -58,7 +59,7 @@ summary(year)
 ```
 So the years column looks fine. We should only have data for 1950 to 2019 for now.
 
-### round
+### `round`
 
 This corresponds to the order of the race in each season. We could check it by seeing how many races there were each year.
 
@@ -81,7 +82,7 @@ ggplot(annual_races_count, aes(x=year, y=races_count))+
 
 The first season had 7 races and over time, we got more races. It'd be interesting to explore **why** the number of races went up.
 
-### race_name
+### `race_name`
 
 `race_name` refers to the country where races were held. Let's explore this variable to see what country has hosted the most races:
 
@@ -104,7 +105,7 @@ Italy and Britain have hosted the most races. If we look at the data though ther
 If I cared about this variable, I might make a new variable for country and create the values for that variable based on this variable.
 
 
-### position
+### `position`
 
 The driver's finishing position. It's either a number or a alphanumeric code with definitions [here](https://www.statsf1.com/en/saisons.aspx). Just in case let's try to explain them:
 
@@ -122,7 +123,7 @@ To really understand these, I'd read up on races where these symbols showed up. 
 
 **TODO**: Find out the best explanation of what each of the above codes mean with examples.
 
-### p_prelim
+### `p_prelim`
 
 My interpretation of the position column. I need to verify this thoroughly to explain the logic I took when I scraped. But I might just create a new column based on the position column.
 
@@ -136,7 +137,7 @@ summary(p_prelim)
 
 **TODO**: Rename column
 
-### driver
+### `driver`
 
 The driver's name. Most of them got scraped well but not all. Would be a good idea to clean the messed up one. We can check which ones need cleaning by seeing how many times each driver competed in F1.
 
@@ -174,7 +175,9 @@ Looking at the list, the names that need to be fixed are:
 * `S�bastien BUEMI` to `Sébastien BUEMI`  
 * `Tom BELS�` to `Tom BELSØ`  
 
-### team
+**TODO**: Fix driver names
+
+### `team`
 
 The name of the team the driver was driving for. The team is the one producing the car so they're also called constructor.
 
@@ -188,11 +191,15 @@ select(race_results, race_id, team)%>%
   summarize(count = n())
 ```
 
-**TODO** Figure out what those `*` next to some teams mean. How should we deal with those?
+**TODO**: Figure out what those `*` next to some teams mean. How should we deal with those? Some examples we have are `Brabham *`, `Cooper *`, `Ferrari *`, `Lola *`, `Lotus *`, `Matra *`, `Porsche *`,`Protos *`, `Tecno *`, `Tojeiro *`.
+
+**TODO**: Fix team names like `Ekstr�m`
 
 There were some `NA` for rows that had `position == '&'`. We should fill with the value from above
 
-### constructor_long
+**TODO**: Fill the team values that were `NA`.
+
+### `constructor_long`
 
 The combination of constructor and engine. Let's look at them:
 ```{r}
@@ -203,7 +210,7 @@ select(race_results, race_id, constructor_long)%>%
 ```
 I don't particularly care about this column, so there is no real need to clean it at the moment.
 
-### extra
+### `extra`
 
 This column contains a variety of extra information like finishing times, lap times, and reasons for not finishing a race among other things. This column should definitely be cleaned up of the extra broken characters, because it might be good to look at the common reasons for not finishing a race. We would definitely have to find a way of getting rid of the lap times and such.
 
@@ -211,11 +218,56 @@ This column contains a variety of extra information like finishing times, lap ti
 
 ## Cleaning Data
 
-While verifying the variables, I've left a list of **TODO**s to look at. Let's try to address some of them in the cleaning:
+While verifying the variables, I've left a list of **TODO**s to look at. Let's try to address the following in cleaning.
 
-* For `position`: find out the best explanation of what each of the above codes mean with examples.  
-* For `p_prelim`: Figure out what the logic for this part was and try to make sure it's correct.
-* For `p_prelim`: Rename the column
-* For `team`: Figure out what those `*` next to some teams mean. How should we deal with those?
-* For `extra`: Remove random character.
+* For `position`:
+    * Find out the best explanation of what each of the above codes mean with examples.
+* For `p_prelim`:
+    * Rename the column to be something like `position_numeric`.
+    * Figure out what the logic for this part was and try to make sure it's correct.
+* For `team`:
+    * Rename column to `constructor`.
+    * Figure out what those `*` next to some teams mean. How should we deal with those? Some examples we have are `Brabham *`, `Cooper *`, `Ferrari *`, `Lola *`, `Lotus *`, `Matra *`, `Porsche *`,`Protos *`, `Tecno *`, `Tojeiro *`.
+    * Fix team names like `Ekstr�m`
+    * Fill the team values that were `NA`.
+* For `extra`:
+    * Remove random character.
+
+
+### Updating `p_prelim`
+
+#### Scraping logic
+`p_prelim` is an interpretation of `position` to have all the drivers listed in numerical order. The script I used to get this data is in my `scripts` folder at: `/scripts/get_race_results_statsf1.py`.
+
+Initially, I worked with this logic: 
+
+```
+if position == "&":
+    # driver finish tied to previous row
+    p = p_index - 1
+elif position == "dsq":
+    # driver disqualified
+    p = -1
+else: 
+    p = max(p_index, p_index-1)
+    p_index += 1
+```
+
+As the script ran, it would go result by result. The first result would get `p_index` of `1`. `p_index` was a variable that was saved as `p_prelim`. The next result would be `p_index` of `2`. This worked great for numeric. If the position was `&` the result referred to a shared drive so the driver should have the same `p_index` as the previous result. For disqualified drivers, I set `p_index` to `-1`. That seemed to work for most of my data.
+
+#### Logic I previously used.
+
+This seemed to work to a degree, but I wanted something to work a little better. Looking at the results previously (check `attempt04` in my archive which has the analysis for the 1950 through 2018 seasons that I used in my first draft of capstone work.)
+
+* If the position is a number (in string form or otherwise) then that is the finishing position of the driver.
+* If the position is `&` then that driver record is for a shared drive and the finishing position of that driver is the same as the record directly above it.
+* If the position is `ab` then the driver retired during the race. The later they retired, the higher they ranked.
+* If the position is `nc` the driver did not classify for the final positions, but did complete most of the race.
+* If the position is `f` then the driver withdrew from a race. They will ranked as the last possible spot.
+* If the position is `np` then the driver did not star the race, but was on the grid. They will be ranked as the last possible spot.
+* If the position is `dsq`, the driver was disqualified and their finishing position will be the the last possible spot.
+* If the position is `npq`, `nq`, `tf` or `exc` the driver's order will be ignored. Let's set it to `NA`.
+
+We can write little code chunks to address each of these points. 
+@@FINISH THIS PART@@
 
