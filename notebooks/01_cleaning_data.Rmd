@@ -1,5 +1,5 @@
 ---
-title: "Cleaning Data"
+title: "Pre-Analysis F1 Data"
 output:
   html_notebook:
     toc: yes
@@ -18,7 +18,7 @@ race_results <- read_csv("../data/race_results_statsf1.csv")
 head(race_results)
 ```
 
-## Looking at the data before we clean. 
+## Looking at the data before we clean 
 
 With this dataset, we have the following columns:
 
@@ -33,7 +33,7 @@ With this dataset, we have the following columns:
 9. `constructor_long`: the combination of the team name and the engine test.
 10. `extra`: extra information like finishing times, lap times, and reasons for retiring, withdrawing, or being removed from a race.
 
-## Verifying the different variables.
+## Explore & Verify variables
 
 Let's go variable by variable, see what's there and then try to make notes of how we might clean this.
 
@@ -134,6 +134,8 @@ summary(p_prelim)
 
 **TODO**: Figure out what the logic for this part was and try to make sure it's correct.
 
+**TODO**: Rename column
+
 ### driver
 
 The driver's name. Most of them got scraped well but not all. Would be a good idea to clean the messed up one. We can check which ones need cleaning by seeing how many times each driver competed in F1.
@@ -204,3 +206,16 @@ I don't particularly care about this column, so there is no real need to clean i
 ### extra
 
 This column contains a variety of extra information like finishing times, lap times, and reasons for not finishing a race among other things. This column should definitely be cleaned up of the extra broken characters, because it might be good to look at the common reasons for not finishing a race. We would definitely have to find a way of getting rid of the lap times and such.
+
+**TODO**: Clear random characters.
+
+## Cleaning Data
+
+While verifying the variables, I've left a list of **TODO**s to look at. Let's try to address some of them in the cleaning:
+
+* For `position`: find out the best explanation of what each of the above codes mean with examples.  
+* For `p_prelim`: Figure out what the logic for this part was and try to make sure it's correct.
+* For `p_prelim`: Rename the column
+* For `team`: Figure out what those `*` next to some teams mean. How should we deal with those?
+* For `extra`: Remove random character.
+
