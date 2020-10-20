@@ -220,17 +220,19 @@ This column contains a variety of extra information like finishing times, lap ti
 
 While verifying the variables, I've left a list of **TODO**s to look at. Let's try to address the following in cleaning.
 
-* For `position`:
+1. For `position`:
     * Find out the best explanation of what each of the above codes mean with examples.
-* For `p_prelim`:
+2. For `p_prelim`:
     * Rename the column to be something like `position_numeric`.
     * Figure out what the logic for this part was and try to make sure it's correct.
-* For `team`:
+3. For `driver`: 
+    * Fix names
+4. For `team`:
     * Rename column to `constructor`.
     * Figure out what those `*` next to some teams mean. How should we deal with those? Some examples we have are `Brabham *`, `Cooper *`, `Ferrari *`, `Lola *`, `Lotus *`, `Matra *`, `Porsche *`,`Protos *`, `Tecno *`, `Tojeiro *`.
     * Fix team names like `Ekstr�m`
     * Fill the team values that were `NA`.
-* For `extra`:
+5. For `extra`:
     * Remove random character.
 
 
@@ -262,12 +264,146 @@ This seemed to work to a degree, but I wanted something to work a little better.
 * If the position is a number (in string form or otherwise) then that is the finishing position of the driver.
 * If the position is `&` then that driver record is for a shared drive and the finishing position of that driver is the same as the record directly above it.
 * If the position is `ab` then the driver retired during the race. The later they retired, the higher they ranked.
-* If the position is `nc` the driver did not classify for the final positions, but did complete most of the race.
-* If the position is `f` then the driver withdrew from a race. They will ranked as the last possible spot.
-* If the position is `np` then the driver did not star the race, but was on the grid. They will be ranked as the last possible spot.
-* If the position is `dsq`, the driver was disqualified and their finishing position will be the the last possible spot.
-* If the position is `npq`, `nq`, `tf` or `exc` the driver's order will be ignored. Let's set it to `NA`.
+* If the position is `nc` the driver did not classify for the final positions, but did complete most of the race. They get ranked in the order they finished.
+* If the position is `np` then the driver did not start the race, but was on the grid. They will be ranked as the last possible spot.
+* If the position is `dsq`, the driver was disqualified and their finishing position will be the the last possible spot + 1.
+* If the position is `f` then the driver withdrew from a race. Let's set it to `0`.
+* If the position is `npq`, `nq`, `tf`,or `exc` the driver's order will be ignored. Let's set it to `0`.
 
 We can write little code chunks to address each of these points. 
-@@FINISH THIS PART@@
 
+### Creating `position_numeric`
+Let's update the p_prelim for the cases where `position` is `f` or `np`. We'll create a new column,`position_numeric_last_place`, for this evaluation.
+```{r}
+ptm <- proc.time()
+
+get_last <- function(some_race_id) {
+  last <- race_results %>%
+    select(race_id, position, driver) %>%
+    filter(race_id == some_race_id) %>%
+    filter(position != "&") %>%
+    distinct(race_id,driver) %>%
+    summarise(count=n()) %>%
+    pull(count)
+  return(last)
+}
+
+race_results_cleaning <- race_results %>%
+  rowwise() %>%
+  mutate(position_numeric_a =
+           case_when(position == "np" |
+                       position == "f" ~
+                       get_last(race_id)))
+# Check how long this chunk took
+run_time <- proc.time() - ptm
+```
+
+Let's update the disqualified drivers, where `position == "dsq"`. This should be the last place plus 1.
+```{r}
+race_results_cleaning <- race_results_cleaning %>%
+  rowwise() %>%
+  mutate(position_numeric_b =
+           case_when(position == "dsq" ~
+               as.integer(get_last(race_id) + 1)))
+```
+
+Let's try combining these two:
+
+```{r}
+rr2 <- race_results_cleaning %>% unite("position_numeric", position_numeric_a, position_numeric_b, na.rm=TRUE)
+```
+Later we can update the column to be numeric. So this is a good test.
+
+Let's keep interpreting the position columns and later combining them. Next we'll do the position values we're setting to zero: `npq`, `nq`, `tf`,and `ex`.
+
+```{r}
+race_results_cleaning <- race_results_cleaning %>%
+  rowwise() %>%
+  mutate(position_numeric_c =
+           case_when(position %in% 
+                       c("npq","nq", "tf", "exc") ~
+                       as.integer(0)))
+```
+
+And for some of the other position values we can just pass the p_prelim value forward.
+```{r}
+get_finish <- function(some_race_id, some_driver) {
+  finish <- race_results %>%
+    select(race_id, p_prelim, driver) %>%
+    filter(race_id == some_race_id, driver == some_driver) %>%
+    pull(p_prelim)
+}
+
+race_results_cleaning <- race_results_cleaning %>%
+  rowwise() %>%
+  mutate(position_numeric_d = list(case_when(
+    position == "&" ~ 
+      as.integer(get_finish(race_id, driver))
+    )))
+```
+
+Looking at this, we have an issue. When there are shared results, and we try to identify the single value in the get_finish function we end up with two, making an issue. So we need to add some sort of result_id to identify each line uniquely.'
+
+```{r}
+race_results_cleaning <- race_results_cleaning %>% add_column(result_id=1:nrow(race_results_cleaning))
+```
+Now let's try that again:
+
+```{r}
+get_finish <- function(some_result_id) {
+  finish <- race_results_cleaning %>%
+    select(result_id, p_prelim) %>%
+    filter(result_id == some_result_id) %>%
+    pull(p_prelim)
+  return(finish)
+}
+
+race_results_cleaning <- race_results_cleaning %>%
+  rowwise() %>%
+  mutate(position_numeric_d2 = case_when(
+    position == "&" ~
+      as.integer(get_finish(result_id))
+    ))
+```
+
+That looks good. Let's finish by creating a fifth `position_numeric_*` column. We'll use it for the last cases. Passing the `p_prelim` values for rows where `position` is a number or `ab` or `nc`.
+
+```{r}
+race_results_cleaning <- race_results_cleaning %>%
+  rowwise() %>%
+  mutate(position_numeric_e = case_when(
+    position %in% c("ab","nc") |
+    !(position %in% c( "&","ab", "nc", "np",
+                      "nq", "npq", "dsq",
+                      "exc", "f", "tf")) ~
+      as.integer(get_finish(result_id))
+    ))
+```
+
+Now we can move to combining all those different `position_numeric_*` into one.
+
+```{r}
+race_results_cleaning <- race_results_cleaning %>% unite("position_numeric", position_numeric_a, position_numeric_b, position_numeric_c,position_numeric_d2, position_numeric_e, na.rm=TRUE) %>%
+  select(-position_numeric_d)
+
+```
+Before we move on, let's turn the `position_numeric` into a double. We can also get rid of `p_prelim` since we have interpreted the `position`.
+```{r}
+race_results_cleaning <- race_results_cleaning %>%
+        mutate(position_numeric =
+                 as.double(position_numeric)) %>%
+        select(-p_prelim)
+```
+
+And let's save it as a csv so we can use it later and not have to run the code that goes so long.
+```{r}
+race_results_cleaning %>% write_csv("../data/race_results_cleaning.csv", append=FALSE)
+```
+ 
+Next up, let's move to fixing the names.
+
+### Fixing `driver` names
+
+There are a lot of names that loaded funny because of some encoding issue. Let's try to rename them and save to make sure that the names are fixed.
+
+@@LOOK At example in CleanIHME to fix this
