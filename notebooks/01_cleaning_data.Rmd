@@ -42,20 +42,16 @@ Let's go variable by variable, see what's there and then try to make notes of ho
 
 Let's look at just this variable right now:
 ```{r}
-race_id <- race_results %>% select(race_id)
-
-summary(race_id)
+summary(race_results["race_id"])
 ```
-Looking at this variable, the biggest value currently is `r max(race_id)`. I know the 2019 Chinese GP was the 1000th race. If I count from that race in the [2019 Calendar](https://en.wikipedia.org/wiki/2019_Formula_One_World_Championship#Calendar) the 21st race of the season, the Abu Dhabi GP, was the 1018th race.
+Looking at this variable, the biggest value currently is `r max(race_results["race_id"])`. I know the 2019 Chinese GP was the 1000th race. If I count from that race in the [2019 Calendar](https://en.wikipedia.org/wiki/2019_Formula_One_World_Championship#Calendar) the 21st race of the season, the Abu Dhabi GP, was the 1018th race.
 
 So that looks good.
 
 ### `year`
 
 ```{r}
-year <- race_results %>% select(year)
-
-summary(year)
+summary(race_results["year"])
 ```
 So the years column looks fine. We should only have data for 1950 to 2019 for now.
 
@@ -74,10 +70,14 @@ race_results %>%
 Let's try to visualize that, by first saving all that previous code to a variable:
 
 ```{r}
-annual_races_count <- race_results %>% select(year, round) %>% distinct(year, round) %>% group_by(year) %>% summarise(races_count = n())
+annual_races_count <- race_results %>% 
+                      select(year, round) %>% 
+                      distinct(year, round) %>% 
+                      group_by(year) %>% 
+                      summarise(races_count = n())
 
 ggplot(annual_races_count, aes(x=year, y=races_count))+
-         geom_point(size=2) + labs(y="Number of races")
+         geom_line() + labs(y="Number of races")
 ```
 
 The first season had 7 races and over time, we got more races. It'd be interesting to explore **why** the number of races went up.
@@ -87,23 +87,23 @@ The first season had 7 races and over time, we got more races. It'd be interesti
 `race_name` refers to the country where races were held. Let's explore this variable to see what country has hosted the most races:
 
 ```{r}
-race_name <- race_results %>% select(race_name)
-
-race_name %>% group_by(race_name) %>% summarize(count = n())
+race_results %>% select(race_name) %>% 
+  group_by(race_name) %>% summarize(count = n())
 ```
 
 Looking at just the race names is difficult. So let's look at the race_name and year.
 
 ```{r}
-race_name <- select(race_results, year, race_name)
-
-race_name %>% distinct(year, race_name) %>% group_by(race_name) %>% summarize(count = n()) %>% arrange(desc(count))
+race_results %>% select(year, race_name) %>% 
+                  distinct(year, race_name) %>% 
+                  group_by(race_name) %>% 
+                  summarize(count = n()) %>% 
+                  arrange(desc(count))
 ```
 
 Italy and Britain have hosted the most races. If we look at the data though there's some weirdness like there being USA, USA East, USA West, Indianapolis, and Las Vegas as all being Grand Prixs that happened in America. For my analysis where I'm looking at team performance, I don't mind this issue as much, but good to note it now.
 
 If I cared about this variable, I might make a new variable for country and create the values for that variable based on this variable.
-
 
 ### `position`
 
@@ -128,8 +128,7 @@ To really understand these, I'd read up on races where these symbols showed up. 
 My interpretation of the position column. I need to verify this thoroughly to explain the logic I took when I scraped. But I might just create a new column based on the position column.
 
 ```{r}
-p_prelim <- select(race_results, p_prelim)
-summary(p_prelim)
+summary(race_results["p_prelim"])
 ```
 `-1` here means the driver was disqualified.
 
@@ -141,12 +140,12 @@ summary(p_prelim)
 
 The driver's name. Most of them got scraped well but not all. Would be a good idea to clean the messed up one. We can check which ones need cleaning by seeing how many times each driver competed in F1.
 
-```{r}
-driver <- select(race_results, race_id, driver)
-driver %>% distinct(race_id, driver) %>%
-          group_by(driver) %>% 
-          summarize(count = n()) %>%
-          arrange(desc(count))
+```{r message=FALSE}
+race_results %>% select(race_id, driver) %>% 
+                  distinct(race_id, driver) %>%
+                  group_by(driver) %>% 
+                  summarize(count = n()) %>%
+                  arrange(desc(count))
 ```
 
 Looking at the list, the names that need to be fixed are:
@@ -184,11 +183,11 @@ The name of the team the driver was driving for. The team is the one producing t
 **TODO:** Rename column to constructor.
 
 Let's look at what teams have been around:
-```{r}
-select(race_results, race_id, team)%>%
-  distinct(race_id, team) %>%
-  group_by(team) %>% 
-  summarize(count = n())
+```{r message=FALSE}
+race_results %>% select(race_id, team)%>%
+                  distinct(race_id, team) %>%
+                  group_by(team) %>% 
+                  summarize(count = n())
 ```
 
 **TODO**: Figure out what those `*` next to some teams mean. How should we deal with those? Some examples we have are `Brabham *`, `Cooper *`, `Ferrari *`, `Lola *`, `Lotus *`, `Matra *`, `Porsche *`,`Protos *`, `Tecno *`, `Tojeiro *`.
@@ -281,7 +280,6 @@ get_last <- function(some_race_id) {
   last <- race_results %>%
     select(race_id, position, driver) %>%
     filter(race_id == some_race_id) %>%
-    filter(position != "&") %>%
     distinct(race_id,driver) %>%
     summarise(count=n()) %>%
     pull(count)
@@ -395,15 +393,192 @@ race_results_cleaning <- race_results_cleaning %>%
         select(-p_prelim)
 ```
 
-And let's save it as a csv so we can use it later and not have to run the code that goes so long.
-```{r}
-race_results_cleaning %>% write_csv("../data/race_results_cleaning.csv", append=FALSE)
-```
- 
+
 Next up, let's move to fixing the names.
 
 ### Fixing `driver` names
 
 There are a lot of names that loaded funny because of some encoding issue. Let's try to rename them and save to make sure that the names are fixed.
 
-@@LOOK At example in CleanIHME to fix this
+Previously I had listed all the names that had to change. They can be more quickly summarized as:
+* `Andr�` to `André`
+* `Azdr�bal` to `Azdrúbal`
+* `Eug�ne` to `Eugène`  
+* `Fran�ois` to `François`
+* `G�nther` to `Günther`  
+* `G�rard` to `Gérard`  
+* `Jean-�ric` to `Jean-Éric`  
+* `Jos�` to `José`  
+* `J�r�me` to `Jérôme`  
+* `ST�CHELIN` to `STÆCHELIN`  
+* `Ren�` to `René`  
+* `S�bastien` to `Sébastien`  
+* `St�phane` to `Stéphane`  
+* `BELS�` to `BELSØ`  
+
+```{r}
+race_results_cleaning <- race_results_cleaning %>% 
+  mutate(driver = str_replace(driver, "Andr�","André")) %>%
+  mutate(driver = str_replace(driver, "Azdr�bal","Azdrúbal")) %>%
+  mutate(driver = str_replace(driver, "Eug�ne","Eugène")) %>%
+  mutate(driver = str_replace(driver, "Fran�ois","François")) %>%
+  mutate(driver = str_replace(driver, "G�nther","Günther")) %>%
+  mutate(driver = str_replace(driver, "G�rard","Gérard")) %>%
+  mutate(driver = str_replace(driver, "Jean-�ric","Jean-Éric")) %>%
+  mutate(driver = str_replace(driver, "Jos�","José")) %>%
+  mutate(driver = str_replace(driver, "J�r�me","Jérôme")) %>%
+  mutate(driver = str_replace(driver, "ST�CHELIN","STAECHELIN")) %>%
+  mutate(driver = str_replace(driver, "Ren�","René")) %>%
+  mutate(driver = str_replace(driver, "S�bastien","Sébastien")) %>%
+  mutate(driver = str_replace(driver, "St�phane","Stéphane")) %>%
+  mutate(driver = str_replace(driver, "BELS�","BELSØ")) %>%
+  mutate(driver = str_replace(driver, "S�bastien","Sébastien"))
+```
+
+### Looking at `team`
+
+Looking at this column:
+* I want to go and clean it up a little bit. I want to rename the column from `team` to `constructor` because that's the term used in F1. I also want to figure out what the `*` in some constructor names were.
+* I want to investigate the teams that have an `*` in their name.
+* I want to fill in the `team` and `constructor_long` for the rows with shared drives.
+
+#### Filling in `team` and `constructor_long`
+
+We can first replace the missing teams with `fill()`.
+```{r}
+race_results_cleaning <- race_results_cleaning %>% fill(team, .direction="down")
+```
+
+To add in the missing `constructor_long`, let's try the following:
+```{r}
+rr2 <- race_results_cleaning %>% 
+          select(position, constructor_long) %>% 
+          mutate(constructor_long = case_when(
+            position == "&" ~ lag(constructor_long),
+            TRUE ~ constructor_long))
+```
+
+That works, so let's do it to the actual cleaning.
+
+```{r}
+race_results_cleaning <- race_results_cleaning %>%
+          mutate(constructor_long = case_when(
+            position == "&" ~ lag(constructor_long),
+            TRUE ~ constructor_long))
+```
+
+
+#### `*` in the name
+I picked a particular race where teams with `*` showed up, the 1958 German Grand Prix. Looking at the [results on Stats F1](https://www.statsf1.com/en/1958/allemagne/classement.aspx), the `*` is a note that those drivers were racing Formula Two cars in Formula One. For some analysis, this distinction might be important so we could proceed with two different ways:
+
+1. Remove the `*` if we don't care that the cars were F2 cars.
+2. Remove those rows, if we care that the cars were F2 cars. 
+
+I particularly don't care too much that the cars were F2 so I'll remove the asterisk. But before that I'll add a column to mark whether the car is F1 or F2, in case I want to look at that distinction later.
+
+```{r}
+rr2 <- race_results_cleaning %>% select(year, race_name, team) %>% rowwise() %>%
+  mutate(is_F1_car = str_detect(team, "\\*", negate= TRUE))
+```
+
+Let's add that column to our main data:
+```{r}
+race_results_cleaning <- race_results_cleaning %>% rowwise() %>%
+  mutate(is_F1_car = str_detect(team, "\\*", negate= TRUE))
+```
+
+And now we can remove the `*` from both the team and `constructor_long` columns:
+```{r}
+race_results_cleaning <- race_results_cleaning %>%
+  mutate(team = str_replace(team," \\*","")) %>%
+  mutate(team = str_squish(team)) %>%
+  mutate(constructor_long = str_replace(constructor_long," \\*","")) %>%
+  mutate(constructor_long = str_squish(constructor_long))
+```
+
+Let's also fix the team `Ekstr�m`
+```{r}
+race_results_cleaning <- race_results_cleaning %>% 
+  mutate(team = str_replace(team, "Ekstr�m","Ekström")) %>%
+  mutate(constructor_long = str_replace(constructor_long, "Ekstr�m","Ekström"))
+```
+
+And finally we can rename the team column to `constructor`
+```{r}
+race_results_cleaning <- race_results_cleaning %>% rename(constructor = team)
+```
+
+### Cleaning the `extra` column
+
+There's a lot I want to do here. I don't care about lap times really. I wish I could select them and delete them. For now, I'll settle on just removing the extra characters:
+```{r}
+rr2 <- race_results_cleaning %>% 
+        select(extra) %>%
+        mutate(extra = str_replace(extra, "�", "")) %>%
+        mutate(extra = str_replace(extra, "�", "")) %>%
+        mutate(extra = str_replace(extra, "�", "")) %>%
+        mutate(extra = str_replace(extra, "�", "")) %>%
+        mutate(extra = str_replace(extra, "�", ""))
+```
+
+While they may all look the same, they are indeed very different sets of random characters. Let's do it in the main data:
+```{r}
+race_results_cleaning <- race_results_cleaning %>%
+        mutate(extra = str_replace(extra, "�", "")) %>%
+        mutate(extra = str_replace(extra, "�", "")) %>%
+        mutate(extra = str_replace(extra, "�", "")) %>%
+        mutate(extra = str_replace(extra, "�", "")) %>%
+        mutate(extra = str_replace(extra, "�", ""))
+```
+
+
+### Looking at racing location
+Let's make that column for race countries... because, why not. Looking at all the race_names, they are mostly good except some odd cases.
+* European was held in various countries based on year [Wikipedia](https://en.wikipedia.org/wiki/European_Grand_Prix#As_an_honorific_title)
+* There have been 5 different grand prixs in America.
+* Pacific GP was in Japan
+* Abu Dhabi GP is in UAE
+* Both Pescara and San Marino GP are in Italy
+
+```{r}
+race_results_cleaning <- race_results_cleaning %>% 
+  mutate(race_country = case_when(
+    race_name == "Britain" ~ "England",
+    race_name %in% c("USA West", "USA East",
+                     "Las Vegas", "Indianapolis") ~ "USA",
+    race_name == "Pacific" ~ "Japan",
+    race_name == "Abu Dhabi" ~ "UAE",
+    race_name %in% c("Pescara", "San Marino") ~ "Italy",
+    race_name == "Europe" & year %in% c(1983, 1985,1993) ~ "England",
+    race_name == "Europe" & year %in% c(1984, 1995, 1996, 1999,
+                                        2000, 2001, 2002,2003,
+                                        2004,2005,2006,2007) ~ "Germany",
+    race_name == "Europe" & year %in% c(1994, 1997, 2008,2009,
+                                        2010,2011,2012) ~ "Spain",
+    race_name == "Europe" & year == 2016 ~ "Azerbaijan",
+    TRUE ~ race_name
+  ))
+```
+
+
+## Saving the clean data
+
+Now that I've cleaned things as far as I can do now, let me save it to a CSV:
+```{r}
+race_results_cleaning <- race_results_cleaning %>% select(result_id,
+                                                          race_id,
+                                                          year,
+                                                          round,
+                                                          race_name,
+                                                          race_country,
+                                                          driver,
+                                                          position,
+                                                          position_numeric,
+                                                          constructor,
+                                                          constructor_long,
+                                                          extra,
+                                                          is_F1_car
+                                                          )
+write_csv(race_results_cleaning, "../data/race_results_clean.csv", append=FALSE)
+```
+
