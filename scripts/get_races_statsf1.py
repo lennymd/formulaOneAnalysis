@@ -28,8 +28,7 @@ for year in range(1950, 2021):
 
         race_list.append([year, round_id, name, rel_url])
 
-    print("Completed", year)
-
+    print("Completed", year,"&&","Race List Length", len(race_list))
     # add some time buffer every 10 years
     if (year % 9) == 0:
         # print("Pause ", year)
