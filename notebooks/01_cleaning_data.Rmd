@@ -1,10 +1,10 @@
 ---
 title: "Pre-Analysis F1 Data"
 output:
-  html_notebook:
-    toc: yes
-  git_document:
-    toc: yes
+  pdf_notebook:
+    toc: true
+    number_sections: true
+
 ---
 
 The purpose of this notebook is to clean the F1 data so I can work with it for my analysis of winning teams.
@@ -23,8 +23,8 @@ head(race_results)
 
 With this dataset, we have the following columns:
 
-1.`race_id`: The number of the race. 1 is the first race in F1, and the biggest number is the last race of 2019 as of now.  
-2. `year`: The year the F1 season took place. Races for a season happened in 1 calendar year.  
+1.`race_id`: The number of the race. 1 is the first race in F1, and the biggest number is the last race of 2019 as of now.
+2. `year`: The year the F1 season took place. Races for a season happened in 1 calendar year.
 3. `round`: The order of the race for that year. 1 is the first race for a season, 2 is the second, and so on.  
 4. `race_name`: Name of the country where the Grand Prix race was held.  
 5. `position`: The finishing position value scraped from Stats F1. There are both number finishes and a series of characters & abbreviations. I tried to interpret these in the `p_prelim` column based on the abbreviations [here](https://www.statsf1.com/en/saisons.aspx)  
@@ -42,9 +42,9 @@ Let's go variable by variable, see what's there and then try to make notes of ho
 
 Let's look at just this variable right now:
 ```{r}
-summary(race_results["race_id"])
+max(race_results["race_id"])
 ```
-Looking at this variable, the biggest value currently is `r max(race_results["race_id"])`. I know the 2019 Chinese GP was the 1000th race. If I count from that race in the [2019 Calendar](https://en.wikipedia.org/wiki/2019_Formula_One_World_Championship#Calendar) the 21st race of the season, the Abu Dhabi GP, was the 1018th race.
+Looking at this variable, the biggest value currently is `r max(race_results["race_id"])`. I know the 2019 Chinese GP was the 1000th race. If I count from that race in the [2019 Calendar](https://en.wikipedia.org/wiki/2019_Formula_One_World_Championship#Calendar) the 21st race of the season, the Abu Dhabi GP, was the 1018th race. These numbers check out moving forward from 2019 to the most recent F1 season, 2021. 
 
 So that looks good.
 
@@ -53,8 +53,8 @@ So that looks good.
 ```{r}
 summary(race_results["year"])
 ```
-So the years column looks fine. We should only have data for 1950 to 2019 for now.
-
+So the years column looks fine. We should only have data for 1950 to 2021. 2022 season is underway.
+ 
 ### `round`
 
 This corresponds to the order of the race in each season. We could check it by seeing how many races there were each year.
@@ -80,7 +80,7 @@ ggplot(annual_races_count, aes(x=year, y=races_count))+
          geom_line() + labs(y="Number of races")
 ```
 
-The first season had 7 races and over time, we got more races. It'd be interesting to explore **why** the number of races went up.
+The first season had 7 races and over time, we got more races. It'd be interesting to explore **why** the number of races went up. (It's a result of marketing and sponsorship, but it'd be cool to see what the changes meant.)
 
 ### `race_name`
 

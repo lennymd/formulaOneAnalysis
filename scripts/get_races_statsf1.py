@@ -6,8 +6,8 @@ import csv
 race_list = [["year", "round", "name", "url"]]
 headers = {"User-Agent": "test"}
 BASE_URL = "https://www.statsf1.com"
-
-for year in range(1950, 2021):
+RECENT_SEASON = 2021
+for year in range(1950, RECENT_SEASON+1):
     # specify the url for the page
     ending = "/en/" + str(year) + ".aspx"
     response = requests.get(BASE_URL + ending, headers=headers)
