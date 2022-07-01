@@ -7,7 +7,7 @@ race_list = [["year", "round", "name", "url"]]
 headers = {"User-Agent": "test"}
 BASE_URL = "https://www.statsf1.com"
 
-for year in range(1950, 2020):
+for year in range(1950, 2021):
     # specify the url for the page
     ending = "/en/" + str(year) + ".aspx"
     response = requests.get(BASE_URL + ending, headers=headers)
