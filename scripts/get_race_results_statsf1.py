@@ -86,7 +86,7 @@ for race in race_list[1:]:
                 p_index += 1
 
             # create the record we'll be saving
-            record = [
+            a_record = [
                 race_id,
                 year,
                 round_id,
@@ -99,7 +99,7 @@ for race in race_list[1:]:
                 extra
                 ]
 
-        race_data_list.append(record)
+        race_data_list.append(a_record)
 
     # pause for a while
     if ((race_id - 1) % 5) == 0:
