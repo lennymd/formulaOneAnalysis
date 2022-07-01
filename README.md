@@ -12,3 +12,5 @@ Maybe run this command, or a variant that works for you:
 ## Data analysis
 
 Data was first analyzed using Jupyter notebooks (see [archive](./archive/) folder). More recent analysis and cleaning is done using R and RStudio because it's easier to combine comments and work within the platform.
+
+We do need to have the `tidyverse` installed in RStudio to clean the data.
